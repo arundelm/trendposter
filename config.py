@@ -51,6 +51,7 @@ class Config:
     database_path: Path = Path("./data/trendposter.db")
     log_level: str = "INFO"
     max_queue_size: int = 50
+    allowed_user_ids: set[int] = field(default_factory=set)
 
 
 # Default model per provider
@@ -181,6 +182,15 @@ def load_config(env_path: str | Path | None = None) -> Config:
 
     db_path = Path(os.getenv("DATABASE_PATH", "./data/trendposter.db"))
 
+    # Allowed user IDs (comma-separated)
+    raw_ids = os.getenv("ALLOWED_USER_IDS", "").strip()
+    allowed_ids = set()
+    if raw_ids:
+        for uid in raw_ids.split(","):
+            uid = uid.strip()
+            if uid.isdigit():
+                allowed_ids.add(int(uid))
+
     return Config(
         x=x_config,
         llm=llm_config,
@@ -189,4 +199,5 @@ def load_config(env_path: str | Path | None = None) -> Config:
         database_path=db_path,
         log_level=os.getenv("LOG_LEVEL", "INFO").upper(),
         max_queue_size=int(os.getenv("MAX_QUEUE_SIZE", "50")),
+        allowed_user_ids=allowed_ids,
     )

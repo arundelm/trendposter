@@ -6,11 +6,11 @@ Queue up tweets, and TrendPoster uses an LLM to analyze current trending topics 
 
 ## How it works
 
-1. **Queue tweets** — Send draft tweets to TrendPoster via Telegram or Discord
-2. **Trend analysis** — On a schedule, TrendPoster scrapes current X trending topics
-3. **Smart matching** — An LLM evaluates which queued tweet best matches current trends
-4. **Auto-post** — The winning tweet gets posted to your X account
-5. **Report back** — You get a message explaining why that tweet was chosen
+1. **Queue tweets** — Send draft tweets to TrendPoster via Telegram or Discord (just type a message!)
+2. **Trend analysis** — TrendPoster scrapes current X trending topics
+3. **Smart matching** — An LLM ranks your queued tweets by relevance to current trends
+4. **Post on your terms** — Use `/top` to see ranked tweets, then `/post <id>` to post the one you want
+5. **Or auto-post** — Optionally let TrendPoster auto-post on a schedule when a match scores high enough
 
 ## Features
 
@@ -19,7 +19,7 @@ Queue up tweets, and TrendPoster uses an LLM to analyze current trending topics 
 - 📊 **Trend scraping** — No expensive X API read tier needed
 - ⏰ **Cron scheduling** — Configurable check intervals
 - 📝 **Queue management** — Add, list, remove, prioritize tweets
-- 🔒 **Secure** — API keys stay in `.env`, never exposed to the bot
+- 🔒 **Secure** — User allowlist, rate limiting, API keys in `.env`
 - 🐳 **Docker ready** — One command deploy
 
 ## Quick Start
@@ -85,9 +85,23 @@ TELEGRAM_BOT_TOKEN=your_token_from_botfather
 DISCORD_BOT_TOKEN=your_token_from_discord_dev_portal
 ```
 
-### Optional: Scheduling
+### Recommended: Restrict bot access
 
 ```env
+# Your Telegram user ID (get it from @userinfobot on Telegram)
+# Comma-separated for multiple users
+ALLOWED_USER_IDS=123456789
+```
+
+If left empty, **anyone** who finds your bot can queue and post tweets to your X account.
+
+### Optional: Scheduling & posting mode
+
+```env
+# Enable automatic posting on interval (default: true)
+# Set to false for manual-only mode — use /top and /post
+AUTO_POST=false
+
 # How often to check trends and consider posting (default: 60 min)
 CHECK_INTERVAL_MINUTES=60
 
@@ -106,14 +120,37 @@ TIMEZONE=America/New_York
 
 | Command | Description |
 |---------|-------------|
+| *(any text)* | Send a message to queue it as a tweet |
 | `/queue <tweet>` | Add a tweet to the queue |
 | `/list` | Show all queued tweets |
 | `/remove <id>` | Remove a tweet from the queue |
 | `/trends` | Show current trending topics |
 | `/analyze` | Run trend analysis now (dry run) |
-| `/post` | Force post the best matching tweet now |
+| `/top <N>` | Rank top N tweets against current trends (default 5) |
+| `/post <id>` | Post a specific tweet by ID |
+| `/post` | Auto-pick and post the best matching tweet |
 | `/status` | Show scheduler status and stats |
 | `/help` | Show all commands |
+
+### Manual posting workflow
+
+Set `AUTO_POST=false` in your `.env`, then:
+
+```
+> My hot take about AI                    # just type — it gets queued
+✅ Queued tweet #12
+
+> Another tweet about the game tonight
+✅ Queued tweet #13
+
+> /top 3                                  # see what matches trends right now
+📊 Top 3 Tweets
+1. #13 — Score: 78/100 ...
+2. #12 — Score: 45/100 ...
+
+> /post 13                                # post the one you want
+✅ Posted!
+```
 
 ## Docker
 
