@@ -1,0 +1,9 @@
+services:
+  trendposter:
+    build: .
+    container_name: trendposter
+    restart: unless-stopped
+    env_file: .env
+    volumes:
+      - ./data:/app/data
+    command: trendposter --bot telegram
