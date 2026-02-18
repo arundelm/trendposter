@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-import asyncio
 import logging
 import time
+from pathlib import Path
 
 from telegram import Update
 from telegram.ext import (
@@ -23,6 +23,9 @@ logger = logging.getLogger(__name__)
 
 # Minimum seconds between expensive operations (LLM calls, posting)
 RATE_LIMIT_SECONDS = 30
+
+# Directory for storing downloaded media
+MEDIA_DIR = Path("./data/media")
 
 
 class TelegramBot:
@@ -47,6 +50,9 @@ class TelegramBot:
 
         # Wire up notifications
         scheduler.set_notify_callback(self._send_notification)
+
+        # Ensure media directory exists
+        MEDIA_DIR.mkdir(parents=True, exist_ok=True)
 
     def _is_authorized(self, update: Update) -> bool:
         """Check if the user is allowed to use the bot."""
@@ -75,6 +81,18 @@ class TelegramBot:
         self.app.add_handler(CommandHandler("status", self._cmd_status))
         # Plain text messages get queued as tweets
         self.app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, self._handle_text))
+        # Photos and videos get queued with media
+        self.app.add_handler(MessageHandler(filters.PHOTO, self._handle_photo))
+        self.app.add_handler(MessageHandler(filters.VIDEO, self._handle_video))
+
+    async def _download_media(self, file_id: str, ext: str) -> str:
+        """Download a Telegram file and return the local path."""
+        tg_file = await self.app.bot.get_file(file_id)
+        filename = f"{file_id}{ext}"
+        local_path = MEDIA_DIR / filename
+        await tg_file.download_to_drive(str(local_path))
+        logger.info(f"Downloaded media to {local_path}")
+        return str(local_path)
 
     async def _send_notification(self, message: str):
         """Send a notification message to the user."""
@@ -110,7 +128,7 @@ class TelegramBot:
             return
         await update.message.reply_text(
             "🐦 *TrendPoster Commands*\n\n"
-            "Just send a message to queue it as a tweet!\n\n"
+            "Send a message, photo, or video to queue it!\n\n"
             "/queue <tweet> — Add a tweet to the queue\n"
             "/list — Show all queued tweets\n"
             "/remove <id> — Remove a tweet\n"
@@ -162,7 +180,10 @@ class TelegramBot:
 
         lines = ["📋 *Queued Tweets*\n"]
         for t in queued:
-            lines.append(f"*#{t.id}* — \"{t.text}\"")
+            media_tag = ""
+            if t.media_type:
+                media_tag = f" 📎{t.media_type}"
+            lines.append(f"*#{t.id}* — \"{t.text}\"{media_tag}")
         await update.message.reply_text("\n".join(lines), parse_mode="Markdown")
 
     async def _cmd_remove(self, update: Update, ctx: ContextTypes.DEFAULT_TYPE):
@@ -339,6 +360,67 @@ class TelegramBot:
         await update.message.reply_text(
             f"✅ Queued tweet #{tweet.id}\n"
             f"\"{text}\"\n\n"
+            f"📋 {self.queue.queue_size()} tweets in queue"
+        )
+
+    async def _handle_photo(self, update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+        """Queue a photo (with optional caption) as a tweet."""
+        if not self._is_authorized(update):
+            return
+        self._chat_id = update.effective_chat.id
+
+        if self.queue.queue_size() >= self.config.max_queue_size:
+            await update.message.reply_text(
+                f"❌ Queue is full ({self.config.max_queue_size} tweets max)"
+            )
+            return
+
+        caption = (update.message.caption or "").strip()
+        if caption and len(caption) > 280:
+            await update.message.reply_text(
+                f"❌ Caption too long ({len(caption)} chars, max 280)"
+            )
+            return
+
+        # Download the highest-resolution photo
+        photo = update.message.photo[-1]  # Last = largest
+        local_path = await self._download_media(photo.file_id, ".jpg")
+
+        tweet = self.queue.add(caption, media_path=local_path, media_type="photo")
+        label = f"\"{caption}\"" if caption else "[photo only]"
+        await update.message.reply_text(
+            f"✅ Queued tweet #{tweet.id} 📷\n"
+            f"{label}\n\n"
+            f"📋 {self.queue.queue_size()} tweets in queue"
+        )
+
+    async def _handle_video(self, update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+        """Queue a video (with optional caption) as a tweet."""
+        if not self._is_authorized(update):
+            return
+        self._chat_id = update.effective_chat.id
+
+        if self.queue.queue_size() >= self.config.max_queue_size:
+            await update.message.reply_text(
+                f"❌ Queue is full ({self.config.max_queue_size} tweets max)"
+            )
+            return
+
+        caption = (update.message.caption or "").strip()
+        if caption and len(caption) > 280:
+            await update.message.reply_text(
+                f"❌ Caption too long ({len(caption)} chars, max 280)"
+            )
+            return
+
+        video = update.message.video
+        local_path = await self._download_media(video.file_id, ".mp4")
+
+        tweet = self.queue.add(caption, media_path=local_path, media_type="video")
+        label = f"\"{caption}\"" if caption else "[video only]"
+        await update.message.reply_text(
+            f"✅ Queued tweet #{tweet.id} 🎥\n"
+            f"{label}\n\n"
             f"📋 {self.queue.queue_size()} tweets in queue"
         )
 

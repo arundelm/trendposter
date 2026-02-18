@@ -9,3 +9,6 @@ build/
 .ruff_cache/
 .DS_Store
 */.DS_Store
+.pytest_cache/
+test_llm.py
+test_queue.py

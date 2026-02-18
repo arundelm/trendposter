@@ -5,7 +5,7 @@ Thanks for your interest in contributing!
 ## Setup for development
 
 ```bash
-git clone https://github.com/yourusername/trendposter.git
+git clone https://github.com/arundelm/trendposter.git
 cd trendposter
 python -m venv .venv
 source .venv/bin/activate

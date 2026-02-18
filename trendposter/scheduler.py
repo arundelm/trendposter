@@ -105,7 +105,10 @@ class Scheduler:
             return analysis
 
         try:
-            result = self.poster.post(analysis.tweet_text)
+            # Find the queued tweet to get media info
+            tweet_obj = next((t for t in queued if t.id == analysis.tweet_id), None)
+            media_path = tweet_obj.media_path if tweet_obj else None
+            result = self.poster.post(analysis.tweet_text, media_path=media_path)
 
             # Log it
             trends_json = json.dumps([{"name": t.name} for t in trends])
@@ -165,7 +168,7 @@ class Scheduler:
             return None
 
         try:
-            result = self.poster.post(tweet.text)
+            result = self.poster.post(tweet.text, media_path=tweet.media_path)
             self.queue.mark_posted(
                 tweet_id=tweet.id,
                 trend="manual",

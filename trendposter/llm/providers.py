@@ -42,11 +42,13 @@ class GeminiProvider(BaseLLMProvider):
     """Google Gemini provider."""
 
     async def complete(self, prompt: str) -> str:
-        import google.generativeai as genai
+        from google import genai
 
-        genai.configure(api_key=self.config.api_key)
-        model = genai.GenerativeModel(self.config.model or "gemini-2.0-flash")
-        response = await model.generate_content_async(prompt)
+        client = genai.Client(api_key=self.config.api_key)
+        response = await client.aio.models.generate_content(
+            model=self.config.model or "gemini-2.0-flash",
+            contents=prompt,
+        )
         return response.text
 
 

@@ -17,6 +17,8 @@ class QueuedTweet:
     relevance_score: float | None = None
     matched_trend: str | None = None
     status: str = "queued"  # queued | posted | expired | removed
+    media_path: str | None = None
+    media_type: str | None = None  # photo | video | None
 
 
 class TweetQueue:
@@ -32,14 +34,22 @@ class TweetQueue:
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS tweets (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    text TEXT NOT NULL,
+                    text TEXT NOT NULL DEFAULT '',
                     added_at TEXT NOT NULL,
                     posted_at TEXT,
                     relevance_score REAL,
                     matched_trend TEXT,
-                    status TEXT NOT NULL DEFAULT 'queued'
+                    status TEXT NOT NULL DEFAULT 'queued',
+                    media_path TEXT,
+                    media_type TEXT
                 )
             """)
+            # Migrate existing DBs that lack media columns
+            try:
+                conn.execute("SELECT media_path FROM tweets LIMIT 1")
+            except sqlite3.OperationalError:
+                conn.execute("ALTER TABLE tweets ADD COLUMN media_path TEXT")
+                conn.execute("ALTER TABLE tweets ADD COLUMN media_type TEXT")
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS post_log (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -58,15 +68,21 @@ class TweetQueue:
         conn.row_factory = sqlite3.Row
         return conn
 
-    def add(self, text: str) -> QueuedTweet:
-        """Add a tweet to the queue."""
+    def add(
+        self, text: str, media_path: str | None = None, media_type: str | None = None
+    ) -> QueuedTweet:
+        """Add a tweet to the queue, optionally with media."""
         now = datetime.now(timezone.utc).isoformat()
         with self._conn() as conn:
             cursor = conn.execute(
-                "INSERT INTO tweets (text, added_at, status) VALUES (?, ?, 'queued')",
-                (text, now),
+                "INSERT INTO tweets (text, added_at, status, media_path, media_type) "
+                "VALUES (?, ?, 'queued', ?, ?)",
+                (text, now, media_path, media_type),
             )
-            return QueuedTweet(id=cursor.lastrowid, text=text, added_at=now)
+            return QueuedTweet(
+                id=cursor.lastrowid, text=text, added_at=now,
+                media_path=media_path, media_type=media_type,
+            )
 
     def list_queued(self) -> list[QueuedTweet]:
         """Get all queued (unposted) tweets."""
