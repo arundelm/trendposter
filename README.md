@@ -56,16 +56,37 @@ trendposter --scheduler-only
 
 ### Required: X API credentials (Free tier)
 
-Get these from [developer.x.com](https://developer.x.com):
+1. Go to [developer.x.com](https://developer.x.com) and sign in
+2. Create a project and app (the **Free** tier works — only write access is needed)
+3. Under **Keys and Tokens**, generate your keys and tokens
+4. Make sure your access token has **Read and Write** permissions (check under User authentication settings)
+
+You'll get several values — here's what goes where:
+
+| X Developer Portal | `.env` variable |
+|---|---|
+| Consumer Key (API Key) | `X_API_KEY` |
+| Consumer Secret (API Secret) | `X_API_SECRET` |
+| Access Token | `X_ACCESS_TOKEN` |
+| Access Token Secret | `X_ACCESS_SECRET` |
+
+The **Bearer Token** is not needed — TrendPoster uses OAuth 1.0a (user auth).
 
 ```env
-X_API_KEY=your_api_key
-X_API_SECRET=your_api_secret
+X_API_KEY=your_consumer_key
+X_API_SECRET=your_consumer_secret
 X_ACCESS_TOKEN=your_access_token
-X_ACCESS_SECRET=your_access_secret
+X_ACCESS_SECRET=your_access_token_secret
 ```
 
 ### Required: At least one LLM provider
+
+| Provider | Cost | Env var |
+|----------|------|---------|
+| **Ollama** (local) | Free | `OLLAMA_BASE_URL` |
+| **Google Gemini** | Free tier available | `GEMINI_API_KEY` |
+| **OpenAI** | Paid per request | `OPENAI_API_KEY` |
+| **Anthropic Claude** | Paid per request | `ANTHROPIC_API_KEY` |
 
 ```env
 # Pick one (or more):
@@ -77,9 +98,19 @@ OLLAMA_BASE_URL=http://localhost:11434
 
 ### Required: At least one bot platform
 
+**Telegram:**
+1. Open Telegram and message [@BotFather](https://t.me/BotFather)
+2. Send `/newbot` and follow the prompts (bot username must end in `bot`)
+3. BotFather gives you a token — that's your `TELEGRAM_BOT_TOKEN`
+
+**Discord:**
+1. Go to [discord.com/developers](https://discord.com/developers/applications) and create an application
+2. Under **Bot**, create a bot and copy the token
+3. Enable **Message Content Intent** under Privileged Gateway Intents
+
 ```env
 # Telegram
-TELEGRAM_BOT_TOKEN=your_token_from_botfather
+TELEGRAM_BOT_TOKEN=7123456789:AAHxxx...
 
 # Discord
 DISCORD_BOT_TOKEN=your_token_from_discord_dev_portal
@@ -165,6 +196,17 @@ Or with Docker Compose:
 docker compose up -d
 ```
 
+## Security
+
+TrendPoster includes several security measures:
+
+- **User allowlist** — Set `ALLOWED_USER_IDS` in `.env` to restrict bot access to your Telegram/Discord user ID. Without this, anyone who discovers your bot can queue and post tweets to your X account.
+- **Rate limiting** — Expensive operations (`/top`, `/analyze`, `/post`) have a 30-second cooldown to prevent LLM API abuse and rapid-fire posting.
+- **Error sanitization** — Internal errors are logged server-side only. Users see generic error messages, preventing information leakage.
+- **Secrets isolation** — All API keys live in `.env` (gitignored) and are never exposed through bot responses.
+
+To get your Telegram user ID, message [@userinfobot](https://t.me/userinfobot) on Telegram.
+
 ## Architecture
 
 ```
@@ -202,8 +244,5 @@ Override with `LLM_PROVIDER=openai` in your `.env`.
 
 ## Contributing
 
-PRs welcome! See [CONTRIBUTING.md](docs/CONTRIBUTING.md) for guidelines.
+PRs welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
-## License
-
-MIT
